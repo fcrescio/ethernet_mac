@@ -31,24 +31,15 @@ entity ethernet_with_fifos is
 		reset_i          : in    std_ulogic;
 		-- MAC address of this station
 		-- Must not change after reset is deasserted
-		mac_address_i    : in    t_mac_address;
-
-		-- MII (Media-independent interface)
-		mii_tx_clk_i     : in    std_ulogic;
-		mii_tx_er_o      : out   std_ulogic;
-		mii_tx_en_o      : out   std_ulogic;
-		mii_txd_o        : out   std_ulogic_vector(7 downto 0);
-		mii_rx_clk_i     : in    std_ulogic;
-		mii_rx_er_i      : in    std_ulogic;
-		mii_rx_dv_i      : in    std_ulogic;
-		mii_rxd_i        : in    std_ulogic_vector(7 downto 0);
-
-		-- GMII (Gigabit media-independent interface)
-		gmii_gtx_clk_o   : out   std_ulogic;
+		mac_address_i    : in    std_ulogic_vector((MAC_ADDRESS_BYTES * 8 - 1) downto 0);
 
 		-- RGMII (Reduced pin count gigabit media-independent interface)
-		rgmii_tx_ctl_o   : out   std_ulogic;
-		rgmii_rx_ctl_i   : in    std_ulogic;
+        rgmii_rxd         : in std_ulogic_vector(3 downto 0);
+        rgmii_rxctl       : in std_ulogic;
+        rgmii_rxc         : in std_ulogic;
+        rgmii_txd         : out std_ulogic_vector(3 downto 0);
+        rgmii_txctl       : out std_ulogic;
+        rgmii_txc         : out std_ulogic;
 
 		-- MII Management Interface
 		-- Clock, can be identical to clock_125_i
@@ -139,17 +130,14 @@ begin
 			reset_i            => reset_i,
 			reset_o            => mac_reset,
 			mac_address_i      => mac_address_i,
-			mii_tx_clk_i       => mii_tx_clk_i,
-			mii_tx_er_o        => mii_tx_er_o,
-			mii_tx_en_o        => mii_tx_en_o,
-			mii_txd_o          => mii_txd_o,
-			mii_rx_clk_i       => mii_rx_clk_i,
-			mii_rx_er_i        => mii_rx_er_i,
-			mii_rx_dv_i        => mii_rx_dv_i,
-			mii_rxd_i          => mii_rxd_i,
-			gmii_gtx_clk_o     => gmii_gtx_clk_o,
-			rgmii_tx_ctl_o     => rgmii_tx_ctl_o,
-			rgmii_rx_ctl_i     => rgmii_rx_ctl_i,
+
+    		rgmii_rxd     => rgmii_rxd,
+            rgmii_rxctl   => rgmii_rxctl,
+            rgmii_rxc       => rgmii_rxc,
+            rgmii_txd       => rgmii_txd,
+            rgmii_txctl     => rgmii_txctl,
+            rgmii_txc       => rgmii_txc,
+			
 			miim_clock_i       => miim_clock_i,
 			mdc_o              => mdc_o,
 			mdio_io            => mdio_io,

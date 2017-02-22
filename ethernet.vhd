@@ -33,23 +33,14 @@ entity ethernet is
 		-- Must not change after reset is deasserted
 		mac_address_i      : in    t_mac_address;
 
-		-- MII (Media-independent interface)
-		mii_tx_clk_i       : in    std_ulogic;
-		mii_tx_er_o        : out   std_ulogic;
-		mii_tx_en_o        : out   std_ulogic;
-		mii_txd_o          : out   std_ulogic_vector(7 downto 0);
-		mii_rx_clk_i       : in    std_ulogic;
-		mii_rx_er_i        : in    std_ulogic;
-		mii_rx_dv_i        : in    std_ulogic;
-		mii_rxd_i          : in    std_ulogic_vector(7 downto 0);
-
-		-- GMII (Gigabit media-independent interface)
-		gmii_gtx_clk_o     : out   std_ulogic;
-
 		-- RGMII (Reduced pin count gigabit media-independent interface)
-		rgmii_tx_ctl_o     : out   std_ulogic;
-		rgmii_rx_ctl_i     : in    std_ulogic;
-
+		rgmii_rxd         : in std_ulogic_vector(3 downto 0);
+		rgmii_rxctl       : in std_ulogic;
+		rgmii_rxc         : in std_ulogic;
+		rgmii_txd         : out std_ulogic_vector(3 downto 0);
+		rgmii_txctl       : out std_ulogic;
+		rgmii_txc         : out std_ulogic;
+		
 		-- MII Management Interface
 		miim_clock_i       : in    std_ulogic;
 		mdc_o              : out   std_ulogic;
@@ -98,8 +89,9 @@ architecture rtl of ethernet is
 	signal mac_rx_byte_received : std_ulogic;
 	signal mac_rx_error         : std_ulogic;
 
-	-- Internal MII bus between mii_gmii and mii_gmii_io
+	-- Internal MII bus between mii_gmii and rgmii_to_mii_io
 	signal int_mii_tx_en : std_ulogic;
+	signal int_mii_tx_er : std_ulogic;
 	signal int_mii_txd   : std_ulogic_vector(7 downto 0);
 	signal int_mii_rx_er : std_ulogic;
 	signal int_mii_rx_dv : std_ulogic;
@@ -127,7 +119,7 @@ begin
 	speed_o              <= speed;
 	miim_phy_address_sig <= MIIM_PHY_ADDRESS;
 	-- Errors are never transmitted in full-duplex mode
-	mii_tx_er_o          <= '0';
+	int_mii_tx_er          <= '0';
 
 	with speed_override_i select speed <=
 		miim_speed when SPEED_UNSPECIFIED,
@@ -175,10 +167,6 @@ begin
 			mii_rx_dv_i        => int_mii_rx_dv,
 			mii_rxd_i          => int_mii_rxd,
 
-			-- RGMII (Reduced pin count gigabit media-independent interface)
-			rgmii_tx_ctl_o     => open,
-			rgmii_rx_ctl_i     => '0',
-
 			-- Interface control signals
 			speed_select_i     => speed,
 			tx_enable_i        => mac_tx_enable,
@@ -191,25 +179,29 @@ begin
 			rx_error_o         => mac_rx_error
 		);
 
-	mii_gmii_io_inst : entity work.mii_gmii_io
+	rgmii_to_mii_io_inst : entity work.rgmii_to_mii_io
 		port map(
 			clock_125_i     => clock_125_i,
-			clock_tx_o      => tx_clock,
-			clock_rx_o      => rx_clock,
 			speed_select_i  => speed,
-			mii_tx_clk_i    => mii_tx_clk_i,
-			mii_tx_en_o     => mii_tx_en_o,
-			mii_txd_o       => mii_txd_o,
-			mii_rx_clk_i    => mii_rx_clk_i,
-			mii_rx_er_i     => mii_rx_er_i,
-			mii_rx_dv_i     => mii_rx_dv_i,
-			mii_rxd_i       => mii_rxd_i,
-			gmii_gtx_clk_o  => gmii_gtx_clk_o,
+			
+    		rgmii_rxd_i     => rgmii_rxd,
+            rgmii_rxctl_i   => rgmii_rxctl,
+            rgmii_rxc_i       => rgmii_rxc,
+            rgmii_txd_o       => rgmii_txd,
+            rgmii_txctl_o     => rgmii_txctl,
+            rgmii_txc_o       => rgmii_txc,
+
+            int_mii_tx_er_i => int_mii_tx_er,
 			int_mii_tx_en_i => int_mii_tx_en,
 			int_mii_txd_i   => int_mii_txd,
 			int_mii_rx_er_o => int_mii_rx_er,
 			int_mii_rx_dv_o => int_mii_rx_dv,
-			int_mii_rxd_o   => int_mii_rxd
+			int_mii_rxd_o   => int_mii_rxd,
+			
+			tx_clock_o  => tx_clock,
+            rx_clock_o  => rx_clock
+            
+
 		);
 
 	framing_inst : entity work.framing

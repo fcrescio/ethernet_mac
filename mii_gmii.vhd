@@ -26,16 +26,6 @@ entity mii_gmii is
 		mii_rx_dv_i        : in  std_ulogic;
 		mii_rxd_i          : in  std_ulogic_vector(7 downto 0);
 
-		-- RGMII (Reduced pin count gigabit media-independent interface)
-		-- Leave open if RGMII is not used
-		rgmii_tx_ctl_o     : out std_ulogic;
-		rgmii_rx_ctl_i     : in  std_ulogic;
-		-- Other pins:
-		-- mii_gtx_clk_o is TXC
-		-- mii_txd_o[3:0] is TD[3:0]
-		-- mii_rx_clk_i is RXC 
-		-- mii_rxd_i[3:0] is RD[3:0]
-
 		-- Interface control signals
 		-- Must stay stable after tx_reset_i or rx_reset_i is deasserted
 		speed_select_i     : in  t_ethernet_speed;
