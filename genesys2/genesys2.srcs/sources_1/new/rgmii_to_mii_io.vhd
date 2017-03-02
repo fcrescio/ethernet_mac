@@ -64,7 +64,7 @@ begin
 
    RXC_inst : IDDR 
    generic map (
-      DDR_CLK_EDGE => "SAME_EDGE_PIPELINED", -- "OPPOSITE_EDGE", "SAME_EDGE" 
+      DDR_CLK_EDGE => "SAME_EDGE", -- "OPPOSITE_EDGE", "SAME_EDGE" 
                                        -- or "SAME_EDGE_PIPELINED" 
       INIT_Q1 => '0', -- Initial value of Q1: '0' or '1'
       INIT_Q2 => '0', -- Initial value of Q2: '0' or '1'
@@ -85,7 +85,7 @@ begin
     gen_rxd : for I in 0 to 3 generate
        RXD_inst : IDDR 
         generic map (
-            DDR_CLK_EDGE => "SAME_EDGE_PIPELINED", -- "OPPOSITE_EDGE", "SAME_EDGE" 
+            DDR_CLK_EDGE => "SAME_EDGE", -- "OPPOSITE_EDGE", "SAME_EDGE" 
                                        -- or "SAME_EDGE_PIPELINED" 
             INIT_Q1 => '0', -- Initial value of Q1: '0' or '1'
             INIT_Q2 => '0', -- Initial value of Q2: '0' or '1'
@@ -105,12 +105,17 @@ begin
 
     -- to support 10/100 operations this clocks should be divided by 50 and 5
     tx_clock_o <= clock_125_i;
-    rgmii_txc_o <= clock_125_i;
+    txc_inst : OBUF
+       port map (
+          O => rgmii_txc_o, -- 1-bit output: Clock output (connect to I/O clock loads).
+          I => clock_125_i  -- 1-bit input: Clock input (connect to an IBUF or BUFMR).
+       );
+    --rgmii_txc_o <= clock_125_i;
     
     txc_a <= int_mii_tx_en_i;
     txc_b <= int_mii_tx_en_i xor int_mii_tx_er_i;
     
-    txc_inst : ODDR
+    txctl_inst : ODDR
     generic map(
        DDR_CLK_EDGE => "SAME_EDGE", -- "OPPOSITE_EDGE" or "SAME_EDGE" 
        INIT => '0',   -- Initial value for Q port ('1' or '0')

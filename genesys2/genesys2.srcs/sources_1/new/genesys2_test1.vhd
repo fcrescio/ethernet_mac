@@ -67,15 +67,16 @@ end genesys2_test1;
 
 architecture Behavioral of genesys2_test1 is
     signal clock_125 : std_ulogic;
+    signal miim_clock : std_ulogic;
     signal int_reset : std_ulogic;
     
     signal int_clock : std_ulogic;
     
     signal sysclk : std_ulogic;
     
-    signal feedback_clock: std_ulogic;
+    signal feedback_clock, feedback_clock_miim: std_ulogic;
     
-    signal link_up_o : std_ulogic;
+    signal link_up_o, datarx_empty, datarx_reset : std_ulogic;
     signal speed_o : std_ulogic_vector(1 downto 0);
     
     signal datarx : std_ulogic_vector(7 downto 0);
@@ -83,7 +84,7 @@ begin
 
     fan_en <= '0';
     
-    led <=  "000000" & speed_o when sw = "00" else
+    led <=  "0000" & datarx_empty & datarx_reset & speed_o when sw = "00" else
             "0000000" & link_up_o when sw = "01" else
             datarx;
 
@@ -99,7 +100,7 @@ begin
    );
 
 
-   PLLE2_BASE_inst : PLLE2_BASE
+   ethclock_inst : PLLE2_BASE
    generic map (
       BANDWIDTH => "OPTIMIZED",  -- OPTIMIZED, HIGH, LOW
       CLKFBOUT_MULT => 5,        -- Multiply value for all CLKOUT, (2-64)
@@ -108,7 +109,7 @@ begin
       -- CLKOUT0_DIVIDE - CLKOUT5_DIVIDE: Divide amount for each CLKOUT (1-128)
       CLKOUT0_DIVIDE => 8,
       CLKOUT1_DIVIDE => 5,
-      CLKOUT2_DIVIDE => 1,
+      CLKOUT2_DIVIDE => 40,
       CLKOUT3_DIVIDE => 1,
       CLKOUT4_DIVIDE => 1,
       CLKOUT5_DIVIDE => 1,
@@ -134,6 +135,7 @@ begin
       -- Clock Outputs: 1-bit (each) output: User configurable clock outputs
       CLKOUT0 => clock_125,   -- 1-bit output: CLKOUT0
       CLKOUT1 => int_clock,
+      CLKOUT2 => miim_clock,
       -- Feedback Clocks: 1-bit (each) output: Clock feedback ports
       CLKFBOUT => feedback_clock, -- 1-bit output: Feedback clock
       LOCKED => open,     -- 1-bit output: LOCK
@@ -149,6 +151,9 @@ begin
     int_reset <= not reset_n;
 
 	ethernetFIFO_inst : entity work.ethernet_with_fifos
+	generic map(
+        MIIM_CLOCK_DIVIDER => 50
+    )
     port map(
         clock_125_i        => clock_125,
         reset_i            => int_reset,
@@ -185,8 +190,8 @@ begin
         -- When asserted, the content of the buffer was lost.
         -- When empty is deasserted the next time, a packet size must be read out.
         -- The data of the packet previously being read out is not available anymore then.
-        rx_reset_o       => open,
-        rx_empty_o       => open,
+        rx_reset_o       => datarx_reset,
+        rx_empty_o       => datarx_empty,
         rx_rd_en_i       => '1',
         rx_data_o        => datarx
 

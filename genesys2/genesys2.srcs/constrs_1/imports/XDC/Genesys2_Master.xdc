@@ -434,7 +434,94 @@ set_property -dict {PACKAGE_PIN W19 IOSTANDARD LVCMOS33} [get_ports fan_en]
 #set_property -dict { PACKAGE_PIN AA17  IOSTANDARD LVCMOS18 } [get_ports { USB_OTG_STP }]; #IO_L23P_T3_32 Sch=usb_otg_stp
 #set_property -dict { PACKAGE_PIN AF16  IOSTANDARD LVCMOS18 } [get_ports { USB_OTG_VBUSOC }]; #IO_L6N_T0_VREF_32 Sch=usb_otg_vbusoc
 
+# system clock
+create_clock -period 5.000 -name sysclk_p -waveform {0.000 2.500} [get_ports sysclk_p]
 
+## RGMII RX
+
+create_clock -period 8.000 -name rgmii_rxc -waveform {0.000 4.000} [get_ports rgmii_rxc]
+
+# Input Delay Constraint
+set_input_delay -clock [get_clocks rgmii_rxc] -max 4.500 [get_ports {{rgmii_rxd[*]} rgmii_rxctl}]
+set_input_delay -clock [get_clocks rgmii_rxc] -min 4.500 [get_ports {{rgmii_rxd[*]} rgmii_rxctl}]
+set_input_delay -clock [get_clocks rgmii_rxc] -clock_fall -max -add_delay 4.500 [get_ports {{rgmii_rxd[*]} rgmii_rxctl}]
+set_input_delay -clock [get_clocks rgmii_rxc] -clock_fall -min -add_delay 4.500 [get_ports {{rgmii_rxd[*]} rgmii_rxctl}]
+
+## RGMII TX
+
+create_generated_clock -name rgmii_txc_OBUF -source [get_pins ethclock_inst/CLKOUT0] -divide_by 1 [get_ports rgmii_txc]
+
+
+# Output Delay Constraints
+set_output_delay -clock [get_clocks rgmii_txc_OBUF] -max 1.200 [get_ports {{rgmii_txd[*]} rgmii_txctl}]
+set_output_delay -clock [get_clocks rgmii_txc_OBUF] -min 1.000 [get_ports {{rgmii_txd[*]} rgmii_txctl}]
+set_output_delay -clock [get_clocks rgmii_txc_OBUF] -clock_fall -max -add_delay 1.200 [get_ports {{rgmii_txd[*]} rgmii_txctl}]
+set_output_delay -clock [get_clocks rgmii_txc_OBUF] -clock_fall -min -add_delay 1.000 [get_ports {{rgmii_txd[*]} rgmii_txctl}]
+
+## MIIM
+
+create_generated_clock -name mdc_OBUF -source [get_pins ethclock_inst/CLKOUT0] -divide_by 50 [get_ports mdc_o]
+
+
+# Output Delay Constraints
+set_output_delay -clock [get_clocks mdc_OBUF] -max 10.000 [get_ports mdio_io]
+set_output_delay -clock [get_clocks mdc_OBUF] -min 10.000 [get_ports mdio_io]
+
+set_input_delay -clock [get_clocks mdc_OBUF] -max 10.000 [get_ports mdio_io]
+set_input_delay -clock [get_clocks mdc_OBUF] -min -10.000 [get_ports mdio_io]
+
+create_generated_clock -name clock_125 -source [get_ports sysclk_p] -edges {1 2 3} -edge_shift {0.000 1.500 3.000} [get_pins ethclock_inst/CLKOUT0]
+
+set_multicycle_path -setup -start -from [get_clocks clock_125] -to [get_clocks mdc_OBUF] 12
+set_multicycle_path -hold -start -from [get_clocks clock_125] -to [get_clocks mdc_OBUF] 11
+
+set_multicycle_path -setup -end -from [get_clocks mdc_OBUF] -to [get_clocks clock_125] 12
+set_multicycle_path -hold -end -from [get_clocks mdc_OBUF] -to [get_clocks clock_125] 11
+
+
+create_generated_clock -name int_clock -source [get_ports sysclk_p] -divide_by 1 [get_pins ethclock_inst/CLKOUT1]
+
+set_clock_groups -asynchronous -group [get_clocks rgmii_rxc] -group [get_clocks int_clock]
+set_clock_groups -asynchronous -group [get_clocks int_clock] -group [get_clocks rgmii_rxc]
+
+
+set_false_path -from [get_ports txbtn]
+set_false_path -from [get_ports reset_n]
+set_false_path -from [get_ports {sw[*]}]
+set_false_path -to [get_ports {{led[0]} {led[1]} {led[2]} {led[3]} {led[4]} {led[5]} {led[6]} {led[7]}}]
+
+
+
+set_false_path -from [get_pins ethernetFIFO_inst/ethernet_inst/reset_generator_inst/reset_o_reg/C] -to [get_pins ethernetFIFO_inst/sync_rx_reset_inst/FDPE_tmp_inst/D]
+
+set_property MARK_DEBUG true [get_nets ethernetFIFO_inst/ethernet_inst/mac_rx_byte_received]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[6]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[5]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[3]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[2]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[0]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[1]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[7]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/mac_rx_data[4]}]
+set_property MARK_DEBUG true [get_nets ethernetFIFO_inst/ethernet_inst/mac_rx_error]
+set_property MARK_DEBUG true [get_nets ethernetFIFO_inst/ethernet_inst/mac_rx_frame]
+
+
+set_property MARK_DEBUG false [get_nets ethernetFIFO_inst/ethernet_inst/rgmii_to_mii_io_inst/rgmii_rxc_i]
+
+set_property MARK_DEBUG false [get_nets ethernetFIFO_inst/ethernet_inst/rgmii_to_mii_io_inst/rgmii_rxctl_i]
+set_property MARK_DEBUG false [get_nets ethernetFIFO_inst/ethernet_inst/rgmii_to_mii_io_inst/rxc_b]
+set_property MARK_DEBUG false [get_nets ethernetFIFO_inst/ethernet_inst/rgmii_to_mii_io_inst/int_mii_rx_dv_o]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[7]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[6]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[5]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[4]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[3]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[2]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[1]}]
+set_property MARK_DEBUG true [get_nets {ethernetFIFO_inst/ethernet_inst/rx_data_o[0]}]
+set_property MARK_DEBUG true [get_nets ethernetFIFO_inst/ethernet_inst/rx_error_o]
+set_property MARK_DEBUG true [get_nets ethernetFIFO_inst/ethernet_inst/rx_frame_o]
 create_debug_core u_ila_0 ila
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_0]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_0]
@@ -448,93 +535,31 @@ set_property port_width 1 [get_debug_ports u_ila_0/clk]
 connect_debug_port u_ila_0/clk [get_nets [list rgmii_rxc_IBUF_BUFG]]
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe0]
 set_property port_width 8 [get_debug_ports u_ila_0/probe0]
-connect_debug_port u_ila_0/probe0 [get_nets [list {datarx[0]} {datarx[1]} {datarx[2]} {datarx[3]} {datarx[4]} {datarx[5]} {datarx[6]} {datarx[7]}]]
+connect_debug_port u_ila_0/probe0 [get_nets [list {ethernetFIFO_inst/ethernet_inst/mac_rx_data[0]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[1]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[2]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[3]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[4]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[5]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[6]} {ethernetFIFO_inst/ethernet_inst/mac_rx_data[7]}]]
 create_debug_port u_ila_0 probe
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe1]
-set_property port_width 2 [get_debug_ports u_ila_0/probe1]
-connect_debug_port u_ila_0/probe1 [get_nets [list {speed_o[0]} {speed_o[1]}]]
+set_property port_width 8 [get_debug_ports u_ila_0/probe1]
+connect_debug_port u_ila_0/probe1 [get_nets [list {ethernetFIFO_inst/ethernet_inst/rx_data_o[0]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[1]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[2]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[3]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[4]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[5]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[6]} {ethernetFIFO_inst/ethernet_inst/rx_data_o[7]}]]
 create_debug_port u_ila_0 probe
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe2]
-set_property port_width 8 [get_debug_ports u_ila_0/probe2]
-connect_debug_port u_ila_0/probe2 [get_nets [list {ethernetFIFO_inst/mac_rx_data[0]} {ethernetFIFO_inst/mac_rx_data[1]} {ethernetFIFO_inst/mac_rx_data[2]} {ethernetFIFO_inst/mac_rx_data[3]} {ethernetFIFO_inst/mac_rx_data[4]} {ethernetFIFO_inst/mac_rx_data[5]} {ethernetFIFO_inst/mac_rx_data[6]} {ethernetFIFO_inst/mac_rx_data[7]}]]
+set_property port_width 1 [get_debug_ports u_ila_0/probe2]
+connect_debug_port u_ila_0/probe2 [get_nets [list ethernetFIFO_inst/ethernet_inst/mac_rx_byte_received]]
 create_debug_port u_ila_0 probe
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe3]
 set_property port_width 1 [get_debug_ports u_ila_0/probe3]
-connect_debug_port u_ila_0/probe3 [get_nets [list txbtn_IBUF]]
+connect_debug_port u_ila_0/probe3 [get_nets [list ethernetFIFO_inst/ethernet_inst/mac_rx_error]]
 create_debug_port u_ila_0 probe
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe4]
 set_property port_width 1 [get_debug_ports u_ila_0/probe4]
-connect_debug_port u_ila_0/probe4 [get_nets [list ethernetFIFO_inst/mac_rx_byte_received]]
+connect_debug_port u_ila_0/probe4 [get_nets [list ethernetFIFO_inst/ethernet_inst/mac_rx_frame]]
 create_debug_port u_ila_0 probe
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe5]
 set_property port_width 1 [get_debug_ports u_ila_0/probe5]
-connect_debug_port u_ila_0/probe5 [get_nets [list ethernetFIFO_inst/mac_rx_error]]
+connect_debug_port u_ila_0/probe5 [get_nets [list ethernetFIFO_inst/ethernet_inst/rx_error_o]]
 create_debug_port u_ila_0 probe
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe6]
 set_property port_width 1 [get_debug_ports u_ila_0/probe6]
-connect_debug_port u_ila_0/probe6 [get_nets [list ethernetFIFO_inst/mac_rx_frame]]
-create_debug_port u_ila_0 probe
-set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe7]
-set_property port_width 1 [get_debug_ports u_ila_0/probe7]
-connect_debug_port u_ila_0/probe7 [get_nets [list ethernetFIFO_inst/mac_rx_reset]]
-
-create_clock -period 8.000 -name rgmii_rxc -waveform {0.000 4.000} [get_ports rgmii_rxc]
-create_clock -period 5.000 -name sysclk_p -waveform {0.000 2.500} [get_ports sysclk_p]
-create_clock -period 8.000 -name VIRTUAL_rgmii_txc_OBUF -waveform {0.000 4.000}
-create_clock -period 5.000 -name VIRTUAL_int_clock -waveform {0.000 2.500}
-set_input_delay -clock [get_clocks rgmii_rxc] -clock_fall -min -add_delay 1.000 [get_ports {rgmii_rxd[*]}]
-set_input_delay -clock [get_clocks rgmii_rxc] -clock_fall -max -add_delay 2.000 [get_ports {rgmii_rxd[*]}]
-set_input_delay -clock [get_clocks rgmii_rxc] -min -add_delay 1.000 [get_ports {rgmii_rxd[*]}]
-set_input_delay -clock [get_clocks rgmii_rxc] -max -add_delay 2.000 [get_ports {rgmii_rxd[*]}]
-set_input_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay 1.000 [get_ports mdio_io]
-set_input_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 4.000 [get_ports mdio_io]
-set_input_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay 1.000 [get_ports reset_n]
-set_input_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 4.000 [get_ports reset_n]
-set_input_delay -clock [get_clocks rgmii_rxc] -clock_fall -min -add_delay 1.000 [get_ports rgmii_rxctl]
-set_input_delay -clock [get_clocks rgmii_rxc] -clock_fall -max -add_delay 2.000 [get_ports rgmii_rxctl]
-set_input_delay -clock [get_clocks rgmii_rxc] -min -add_delay 1.000 [get_ports rgmii_rxctl]
-set_input_delay -clock [get_clocks rgmii_rxc] -max -add_delay 2.000 [get_ports rgmii_rxctl]
-set_input_delay -clock [get_clocks VIRTUAL_int_clock] -min -add_delay 1.000 [get_ports txbtn]
-set_input_delay -clock [get_clocks VIRTUAL_int_clock] -max -add_delay 4.000 [get_ports txbtn]
-set_output_delay -clock [get_clocks VIRTUAL_int_clock] -min -add_delay -1.000 [get_ports {led[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_int_clock] -max -add_delay 1.000 [get_ports {led[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay -1.000 [get_ports {led[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 1.000 [get_ports {led[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -clock_fall -min -add_delay -1.000 [get_ports {rgmii_txd[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -clock_fall -max -add_delay 1.000 [get_ports {rgmii_txd[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay -1.200 [get_ports {rgmii_txd[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 1.200 [get_ports {rgmii_txd[*]}]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay -4.000 [get_ports mdc_o]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 4.000 [get_ports mdc_o]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay -4.000 [get_ports mdio_io]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 4.000 [get_ports mdio_io]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -clock_fall -min -add_delay -1.200 [get_ports rgmii_txctl]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -clock_fall -max -add_delay 1.200 [get_ports rgmii_txctl]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -min -add_delay -1.000 [get_ports rgmii_txctl]
-set_output_delay -clock [get_clocks VIRTUAL_rgmii_txc_OBUF] -max -add_delay 1.000 [get_ports rgmii_txctl]
-create_clock -period 10.000 -name virtual_clock -waveform {0.000 5.000}
-set_input_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {sw[0]}]
-set_input_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {sw[0]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[0]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[0]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[1]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[1]}]
-set_input_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {sw[1]}]
-set_input_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {sw[1]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[2]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[2]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[3]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[3]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[4]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[4]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[5]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[5]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[6]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[6]}]
-set_output_delay -clock [get_clocks virtual_clock] -min -add_delay 1.000 [get_ports {led[7]}]
-set_output_delay -clock [get_clocks virtual_clock] -max -add_delay 10.000 [get_ports {led[7]}]
-set_clock_groups -asynchronous -group [get_clocks rgmii_rxc] -group [get_clocks int_clock]
-set_clock_groups -asynchronous -group [get_clocks int_clock] -group [get_clocks rgmii_rxc]
+connect_debug_port u_ila_0/probe6 [get_nets [list ethernetFIFO_inst/ethernet_inst/rx_frame_o]]
 set_property C_CLK_INPUT_FREQ_HZ 300000000 [get_debug_cores dbg_hub]
 set_property C_ENABLE_CLK_DIVIDER false [get_debug_cores dbg_hub]
 set_property C_USER_SCAN_CHAIN 1 [get_debug_cores dbg_hub]
